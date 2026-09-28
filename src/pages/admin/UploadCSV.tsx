@@ -2,6 +2,7 @@ import { useRef, useState, type DragEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { parseCsvFile, downloadSampleCsv, type CsvRawRow } from '../../lib/csv'
+import { normalizeDestinationUrl } from '../../lib/validation'
 import { Spinner } from '../../components/Spinner'
 
 type Stage = 'upload' | 'preview' | 'result'
@@ -27,7 +28,6 @@ interface ResultData {
 
 const ERROR_LABELS: Record<string, string> = {
   missing_qr_number: 'Missing QR number',
-  missing_qr_name: 'Missing QR name',
   invalid_url: 'Invalid URL',
   invalid_password: 'Password too short (min 4 characters)',
   duplicate_in_file: 'Duplicate QR number within this file',
@@ -55,8 +55,11 @@ export function UploadCSV() {
     setLoading(true)
     try {
       const parsed = await parseCsvFile(file)
-      setRows(parsed)
-      const { data, error: rpcError } = await supabase.rpc('admin_process_qr_csv', { p_rows: parsed, p_dry_run: true })
+      const normalized = parsed.map((row) =>
+        row.destination_url ? { ...row, destination_url: normalizeDestinationUrl(row.destination_url) } : row,
+      )
+      setRows(normalized)
+      const { data, error: rpcError } = await supabase.rpc('admin_process_qr_csv', { p_rows: normalized, p_dry_run: true })
       if (rpcError || !data?.ok) {
         setError('Could not validate this file. Please check its format and try again.')
         setLoading(false)
@@ -238,7 +241,8 @@ export function UploadCSV() {
           Download Sample CSV
         </button>
         <p className="mt-2 text-center text-xs text-gray-400">
-          destination_url can be left blank — that QR will prompt whoever scans it first to set it.
+          qr_name and destination_url can both be left blank. A blank name falls back to the QR number, and a
+          blank link prompts whoever scans it first to set it.
         </p>
       </div>
     </div>

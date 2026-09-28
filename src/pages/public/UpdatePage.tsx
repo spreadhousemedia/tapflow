@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { isUrlReachable, isValidDestinationUrl, normalizeQrNumber } from '../../lib/validation'
+import { isUrlReachable, isValidDestinationUrl, normalizeDestinationUrl, normalizeQrNumber } from '../../lib/validation'
 import { rpcErrorMessage } from '../../types'
 import { Spinner } from '../../components/Spinner'
 
@@ -28,14 +28,16 @@ export function UpdatePage() {
       setError('Please enter a QR number.')
       return
     }
-    if (!isValidDestinationUrl(newUrl.trim())) {
+    const normalizedUrl = normalizeDestinationUrl(newUrl)
+    if (!isValidDestinationUrl(normalizedUrl)) {
       setError('Please enter a valid URL.')
       return
     }
+    setNewUrl(normalizedUrl)
 
     setSubmitting(true)
 
-    const reachable = await isUrlReachable(newUrl.trim())
+    const reachable = await isUrlReachable(normalizedUrl)
     if (!reachable) {
       setSubmitting(false)
       setError("We couldn't open this link. Please check it and try again.")
@@ -44,7 +46,7 @@ export function UpdatePage() {
 
     const { data, error: rpcError } = await supabase.rpc('request_qr_update', {
       p_qr_number: normalizeQrNumber(qrNumber),
-      p_new_url: newUrl.trim(),
+      p_new_url: normalizedUrl,
     })
     setSubmitting(false)
 
@@ -67,7 +69,7 @@ export function UpdatePage() {
     setSubmitting(true)
     const { data, error: rpcError } = await supabase.rpc('confirm_qr_update', {
       p_qr_number: normalizeQrNumber(qrNumber),
-      p_new_url: newUrl.trim(),
+      p_new_url: normalizeDestinationUrl(newUrl),
       p_password: password,
     })
     setSubmitting(false)

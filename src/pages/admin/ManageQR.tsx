@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { isUrlReachable, isValidDestinationUrl, isValidPassword } from '../../lib/validation'
+import { isUrlReachable, isValidDestinationUrl, isValidPassword, normalizeDestinationUrl } from '../../lib/validation'
 import { qrPublicUrl } from '../../lib/config'
 import { downloadBulkQrZip } from '../../lib/qr'
 import { StatusBadge } from '../../components/StatusBadge'
@@ -421,11 +421,12 @@ function EditQrModal({ row, onClose, onSaved }: { row: Row; onClose: () => void;
       setError('QR name is required.')
       return
     }
-    const trimmedUrl = destinationUrl.trim()
+    const trimmedUrl = normalizeDestinationUrl(destinationUrl)
     if (trimmedUrl && !isValidDestinationUrl(trimmedUrl)) {
       setError('Please enter a valid URL.')
       return
     }
+    setDestinationUrl(trimmedUrl)
     setSaving(true)
 
     if (trimmedUrl && trimmedUrl !== (row.destination_url ?? '')) {

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { isUrlReachable, isValidDestinationUrl, isValidPassword, SERIES_PREFIX_PATTERN } from '../../lib/validation'
+import { isUrlReachable, isValidDestinationUrl, isValidPassword, normalizeDestinationUrl, SERIES_PREFIX_PATTERN } from '../../lib/validation'
 import { rpcErrorMessage, type PasswordMode } from '../../types'
 import { downloadBulkQrZip } from '../../lib/qr'
 import { downloadPasswordsCsv } from '../../lib/csv'
@@ -40,7 +40,7 @@ export function BulkQR() {
   const [submitting, setSubmitting] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState<{ done: number; total: number } | null>(null)
 
-  function validate(): boolean {
+  function validate(urlValue: string): boolean {
     const errors: Record<string, string> = {}
     if (!batchName.trim()) errors.batchName = 'Batch name is required.'
     if (!SERIES_PREFIX_PATTERN.test(seriesPrefix.trim())) errors.seriesPrefix = '1-10 letters/numbers only.'
@@ -56,14 +56,14 @@ export function BulkQR() {
     if (passwordMode === 'common' && !isValidPassword(commonPassword)) {
       errors.commonPassword = 'Password must be at least 4 characters.'
     }
-    if (defaultUrl.trim() && !isValidDestinationUrl(defaultUrl.trim())) {
+    if (urlValue && !isValidDestinationUrl(urlValue)) {
       errors.defaultUrl = 'Please enter a valid URL.'
     }
     setFieldErrors(errors)
     return Object.keys(errors).length === 0
   }
 
-  async function runBatch(dryRun: boolean) {
+  async function runBatch(dryRun: boolean, urlValue: string) {
     const { data, error } = await supabase.rpc('admin_create_batch', {
       p_batch_name: batchName.trim(),
       p_series_prefix: seriesPrefix.trim().toUpperCase(),
@@ -71,7 +71,7 @@ export function BulkQR() {
       p_end_number: endNumber.trim(),
       p_password_mode: passwordMode,
       p_common_password: passwordMode === 'common' ? commonPassword : null,
-      p_default_url: defaultUrl.trim() || null,
+      p_default_url: urlValue || null,
       p_dry_run: dryRun,
     })
     return { data, error }
@@ -81,13 +81,15 @@ export function BulkQR() {
     e.preventDefault()
     setFormError(null)
     setConflicts(null)
-    if (!validate()) return
+
+    const normalizedUrl = normalizeDestinationUrl(defaultUrl)
+    setDefaultUrl(normalizedUrl)
+    if (!validate(normalizedUrl)) return
 
     setSubmitting(true)
 
-    const trimmedDefaultUrl = defaultUrl.trim()
-    if (trimmedDefaultUrl) {
-      const reachable = await isUrlReachable(trimmedDefaultUrl)
+    if (normalizedUrl) {
+      const reachable = await isUrlReachable(normalizedUrl)
       if (!reachable) {
         setSubmitting(false)
         setFieldErrors((prev) => ({ ...prev, defaultUrl: "We couldn't open this link. Please double-check it." }))
@@ -95,7 +97,7 @@ export function BulkQR() {
       }
     }
 
-    const { data, error } = await runBatch(true)
+    const { data, error } = await runBatch(true, normalizedUrl)
     setSubmitting(false)
 
     if (error || !data?.ok) {
@@ -114,7 +116,7 @@ export function BulkQR() {
   async function handleConfirmGenerate() {
     setSubmitting(true)
     setFormError(null)
-    const { data, error } = await runBatch(false)
+    const { data, error } = await runBatch(false, normalizeDestinationUrl(defaultUrl))
     setSubmitting(false)
 
     if (error || !data?.ok) {

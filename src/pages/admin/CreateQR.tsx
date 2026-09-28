@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { isUrlReachable, isValidDestinationUrl, isValidPassword, isValidQrNumber, normalizeQrNumber } from '../../lib/validation'
+import { isUrlReachable, isValidDestinationUrl, isValidPassword, isValidQrNumber, normalizeDestinationUrl, normalizeQrNumber } from '../../lib/validation'
 import { rpcErrorMessage } from '../../types'
 import { downloadSingleQr, generateQrDataUrl } from '../../lib/qr'
 import { qrPublicUrl } from '../../lib/config'
@@ -27,11 +27,11 @@ export function CreateQR() {
     generateQrDataUrl(created.qr_number).then(setPreviewDataUrl)
   }, [created])
 
-  function validate(): boolean {
+  function validate(urlValue: string): boolean {
     const errors: Record<string, string> = {}
     if (!isValidQrNumber(qrNumber)) errors.qrNumber = 'Use letters, numbers, hyphens or underscores only.'
     if (!qrName.trim()) errors.qrName = 'QR name is required.'
-    if (destinationUrl.trim() && !isValidDestinationUrl(destinationUrl.trim())) errors.destinationUrl = 'Please enter a valid URL.'
+    if (urlValue && !isValidDestinationUrl(urlValue)) errors.destinationUrl = 'Please enter a valid URL.'
     if (!isValidPassword(password)) errors.password = 'Password must be at least 4 characters.'
     setFieldErrors(errors)
     return Object.keys(errors).length === 0
@@ -41,9 +41,11 @@ export function CreateQR() {
     e.preventDefault()
     setFormError(null)
     setCreated(null)
-    if (!validate()) return
 
-    const trimmedUrl = destinationUrl.trim()
+    const trimmedUrl = normalizeDestinationUrl(destinationUrl)
+    setDestinationUrl(trimmedUrl)
+    if (!validate(trimmedUrl)) return
+
     setSubmitting(true)
 
     if (trimmedUrl) {

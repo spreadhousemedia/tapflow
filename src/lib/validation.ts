@@ -14,6 +14,17 @@ export function isValidDestinationUrl(value: string): boolean {
   return /^https?:\/\/[^\s]+\.[^\s]+/i.test(value)
 }
 
+/**
+ * Adds `https://` to a bare domain like "instagram.com" so it isn't rejected
+ * for missing a scheme. Leaves any existing scheme (http://, ftp://, ...)
+ * alone so isValidDestinationUrl can still reject non-http(s) protocols.
+ */
+export function normalizeDestinationUrl(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed || /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) return trimmed
+  return `https://${trimmed}`
+}
+
 export function normalizeQrNumber(value: string): string {
   return value.trim().toUpperCase()
 }
