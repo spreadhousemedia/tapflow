@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { isValidDestinationUrl, isValidPassword, SERIES_PREFIX_PATTERN } from '../../lib/validation'
+import { isUrlReachable, isValidDestinationUrl, isValidPassword, SERIES_PREFIX_PATTERN } from '../../lib/validation'
 import { rpcErrorMessage, type PasswordMode } from '../../types'
 import { downloadBulkQrZip } from '../../lib/qr'
 import { downloadPasswordsCsv } from '../../lib/csv'
@@ -84,6 +84,17 @@ export function BulkQR() {
     if (!validate()) return
 
     setSubmitting(true)
+
+    const trimmedDefaultUrl = defaultUrl.trim()
+    if (trimmedDefaultUrl) {
+      const reachable = await isUrlReachable(trimmedDefaultUrl)
+      if (!reachable) {
+        setSubmitting(false)
+        setFieldErrors((prev) => ({ ...prev, defaultUrl: "We couldn't open this link. Please double-check it." }))
+        return
+      }
+    }
+
     const { data, error } = await runBatch(true)
     setSubmitting(false)
 
@@ -228,7 +239,7 @@ export function BulkQR() {
           <SummaryRow label="Series" value={`${preview.first} - ${preview.last}`} />
           <SummaryRow label="Total QR Codes" value={String(preview.total)} />
           <SummaryRow label="Password Mode" value={passwordMode === 'common' ? 'Same Password For All' : 'Auto Generate Unique Passwords'} />
-          <SummaryRow label="Default URL" value={defaultUrl.trim() || 'https://example.com'} />
+          <SummaryRow label="Default URL" value={defaultUrl.trim() || 'Not set — first scan of each QR will prompt for it'} />
 
           {formError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>}
 
@@ -320,6 +331,9 @@ export function BulkQR() {
             inputMode="url"
             className={inputClass(!!fieldErrors.defaultUrl)}
           />
+          <p className="mt-1 text-xs text-gray-400">
+            Leave blank so each QR's first scanner is prompted to set their own destination. Fill in only if the whole batch should share one link.
+          </p>
         </Field>
 
         {formError && (

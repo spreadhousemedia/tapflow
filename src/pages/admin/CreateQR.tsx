@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { isValidDestinationUrl, isValidPassword, isValidQrNumber, normalizeQrNumber } from '../../lib/validation'
+import { isUrlReachable, isValidDestinationUrl, isValidPassword, isValidQrNumber, normalizeQrNumber } from '../../lib/validation'
 import { rpcErrorMessage } from '../../types'
 import { downloadSingleQr, generateQrDataUrl } from '../../lib/qr'
 import { qrPublicUrl } from '../../lib/config'
@@ -31,7 +31,7 @@ export function CreateQR() {
     const errors: Record<string, string> = {}
     if (!isValidQrNumber(qrNumber)) errors.qrNumber = 'Use letters, numbers, hyphens or underscores only.'
     if (!qrName.trim()) errors.qrName = 'QR name is required.'
-    if (!isValidDestinationUrl(destinationUrl.trim())) errors.destinationUrl = 'Please enter a valid URL.'
+    if (destinationUrl.trim() && !isValidDestinationUrl(destinationUrl.trim())) errors.destinationUrl = 'Please enter a valid URL.'
     if (!isValidPassword(password)) errors.password = 'Password must be at least 4 characters.'
     setFieldErrors(errors)
     return Object.keys(errors).length === 0
@@ -43,11 +43,22 @@ export function CreateQR() {
     setCreated(null)
     if (!validate()) return
 
+    const trimmedUrl = destinationUrl.trim()
     setSubmitting(true)
+
+    if (trimmedUrl) {
+      const reachable = await isUrlReachable(trimmedUrl)
+      if (!reachable) {
+        setSubmitting(false)
+        setFieldErrors((prev) => ({ ...prev, destinationUrl: "We couldn't open this link. Please double-check it." }))
+        return
+      }
+    }
+
     const { data, error } = await supabase.rpc('admin_create_single_qr', {
       p_qr_number: normalizeQrNumber(qrNumber),
       p_qr_name: qrName.trim(),
-      p_destination_url: destinationUrl.trim(),
+      p_destination_url: trimmedUrl,
       p_password: password,
       p_status: status,
     })
@@ -140,7 +151,7 @@ export function CreateQR() {
             className={inputClass(!!fieldErrors.qrName)}
           />
         </Field>
-        <Field label="Destination Link" error={fieldErrors.destinationUrl}>
+        <Field label="Destination Link (optional)" error={fieldErrors.destinationUrl}>
           <input
             value={destinationUrl}
             onChange={(e) => setDestinationUrl(e.target.value)}
@@ -148,6 +159,9 @@ export function CreateQR() {
             inputMode="url"
             className={inputClass(!!fieldErrors.destinationUrl)}
           />
+          <p className="mt-1 text-xs text-gray-400">
+            Leave blank to let whoever scans this QR first set the destination themselves.
+          </p>
         </Field>
         <Field label="Password" error={fieldErrors.password}>
           <input

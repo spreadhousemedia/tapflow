@@ -5,7 +5,7 @@ export interface QrCode {
   id: string
   qr_number: string
   qr_name: string
-  destination_url: string
+  destination_url: string | null
   status: QrStatus
   batch_id: string | null
   created_at: string

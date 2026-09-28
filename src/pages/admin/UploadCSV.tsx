@@ -237,6 +237,9 @@ export function UploadCSV() {
         >
           Download Sample CSV
         </button>
+        <p className="mt-2 text-center text-xs text-gray-400">
+          destination_url can be left blank — that QR will prompt whoever scans it first to set it.
+        </p>
       </div>
     </div>
   )

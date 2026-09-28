@@ -1,14 +1,19 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { isValidDestinationUrl, normalizeQrNumber } from '../../lib/validation'
+import { isUrlReachable, isValidDestinationUrl, normalizeQrNumber } from '../../lib/validation'
 import { rpcErrorMessage } from '../../types'
 import { Spinner } from '../../components/Spinner'
 
 type Step = 'form' | 'password' | 'success'
 
 export function UpdatePage() {
+  const [searchParams] = useSearchParams()
+  const scannedQrNumber = searchParams.get('qr')
+  const qrNumberLocked = !!scannedQrNumber
+
   const [step, setStep] = useState<Step>('form')
-  const [qrNumber, setQrNumber] = useState('')
+  const [qrNumber, setQrNumber] = useState(scannedQrNumber ?? '')
   const [newUrl, setNewUrl] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -29,6 +34,14 @@ export function UpdatePage() {
     }
 
     setSubmitting(true)
+
+    const reachable = await isUrlReachable(newUrl.trim())
+    if (!reachable) {
+      setSubmitting(false)
+      setError("We couldn't open this link. Please check it and try again.")
+      return
+    }
+
     const { data, error: rpcError } = await supabase.rpc('request_qr_update', {
       p_qr_number: normalizeQrNumber(qrNumber),
       p_new_url: newUrl.trim(),
@@ -66,14 +79,17 @@ export function UpdatePage() {
     setStep('success')
   }
 
-  function reset() {
-    setStep('form')
-    setQrNumber('')
-    setNewUrl('')
-    setPassword('')
-    setShowPassword(false)
-    setError(null)
-  }
+  // Once saved, this is done: take them to the link now, same as scanning the
+  // QR would. No path back to re-submit from this screen — editing again
+  // later goes through the normal QR number + password flow, same as anyone
+  // else who knows the password.
+  useEffect(() => {
+    if (step !== 'success') return
+    const timer = setTimeout(() => {
+      window.location.replace(newUrl.trim())
+    }, 2500)
+    return () => clearTimeout(timer)
+  }, [step, newUrl])
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-10">
@@ -84,9 +100,13 @@ export function UpdatePage() {
               <path d="M10 13a5 5 0 007.07 0l1.93-1.93a5 5 0 00-7.07-7.07L10.5 5.43" strokeLinecap="round" strokeLinejoin="round" />
               <path d="M14 11a5 5 0 00-7.07 0L5 12.93a5 5 0 007.07 7.07l1.43-1.43" strokeLinecap="round" strokeLinejoin="round" />
             </HeaderIcon>
-            <h1 className="text-center text-xl font-bold text-gray-900">Update QR Link</h1>
+            <h1 className="text-center text-xl font-bold text-gray-900">
+              {qrNumberLocked ? 'Set Up Your QR Link' : 'Update QR Link'}
+            </h1>
             <p className="mt-2 text-center text-sm text-gray-500">
-              Enter your QR number and new link to update the content in this QR code.
+              {qrNumberLocked
+                ? "This is the first time this QR has been scanned. Enter the link it should open, and you're set."
+                : 'Enter your QR number and new link to update the content in this QR code.'}
             </p>
 
             <div className="mt-6 space-y-4">
@@ -99,7 +119,10 @@ export function UpdatePage() {
                   value={qrNumber}
                   onChange={(e) => setQrNumber(e.target.value)}
                   placeholder="Enter QR number"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-3 text-base focus:border-brand-500"
+                  readOnly={qrNumberLocked}
+                  className={`w-full rounded-lg border px-3 py-3 text-base focus:border-brand-500 ${
+                    qrNumberLocked ? 'border-gray-200 bg-gray-100 text-gray-500' : 'border-gray-300'
+                  }`}
                   autoCapitalize="characters"
                 />
               </div>
@@ -113,6 +136,7 @@ export function UpdatePage() {
                   onChange={(e) => setNewUrl(e.target.value)}
                   placeholder="https://example.com"
                   inputMode="url"
+                  autoFocus={qrNumberLocked}
                   className="w-full rounded-lg border border-gray-300 px-3 py-3 text-base focus:border-brand-500"
                 />
               </div>
@@ -235,11 +259,15 @@ export function UpdatePage() {
 
             <button
               type="button"
-              onClick={reset}
+              onClick={() => window.location.replace(newUrl.trim())}
               className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-3 text-base font-semibold text-white hover:bg-brand-700"
             >
-              Done
+              Continue to My Link
             </button>
+            <p className="mt-3 flex items-center justify-center gap-2 text-center text-xs text-gray-400">
+              <Spinner size={12} />
+              Redirecting automatically…
+            </p>
           </div>
         )}
       </div>

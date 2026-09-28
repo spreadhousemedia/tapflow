@@ -13,7 +13,7 @@ interface RecentRow {
   id: string
   qr_number: string
   qr_name: string
-  destination_url: string
+  destination_url: string | null
   status: QrStatus
   created_at: string
   batches: { batch_name: string } | null
@@ -146,9 +146,13 @@ export function Dashboard() {
                     <td className="px-4 py-3 text-gray-600">{row.qr_name}</td>
                     <td className="px-4 py-3 text-gray-500">{row.batches?.batch_name ?? '—'}</td>
                     <td className="max-w-[220px] truncate px-4 py-3 text-brand-600">
-                      <a href={row.destination_url} target="_blank" rel="noreferrer" title={row.destination_url}>
-                        {row.destination_url}
-                      </a>
+                      {row.destination_url ? (
+                        <a href={row.destination_url} target="_blank" rel="noreferrer" title={row.destination_url}>
+                          {row.destination_url}
+                        </a>
+                      ) : (
+                        <span className="italic text-gray-400">Not set yet</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={row.status} />

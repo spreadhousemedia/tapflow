@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { Spinner } from '../../components/Spinner'
 
@@ -7,6 +7,7 @@ type ViewState = 'loading' | 'not_found' | 'inactive' | 'redirecting' | 'error'
 
 export function QRRedirect() {
   const { qrNumber } = useParams<{ qrNumber: string }>()
+  const navigate = useNavigate()
   const [state, setState] = useState<ViewState>('loading')
 
   useEffect(() => {
@@ -25,13 +26,21 @@ export function QRRedirect() {
         return
       }
 
-      const row = data[0] as { status: string; destination_url: string }
+      const row = data[0] as { status: string; destination_url: string | null }
       if (row.status !== 'active') {
         setState('inactive')
         return
       }
 
       setState('redirecting')
+
+      // First scan of a freshly created QR: no destination has been set yet.
+      // Send the scanner straight to the setup flow instead of nowhere.
+      if (!row.destination_url) {
+        navigate(`/update?qr=${encodeURIComponent(qrNumber)}`, { replace: true })
+        return
+      }
+
       window.location.replace(row.destination_url)
     }
 
@@ -39,7 +48,7 @@ export function QRRedirect() {
     return () => {
       cancelled = true
     }
-  }, [qrNumber])
+  }, [qrNumber, navigate])
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { isValidDestinationUrl, isValidPassword } from '../../lib/validation'
+import { isUrlReachable, isValidDestinationUrl, isValidPassword } from '../../lib/validation'
 import { qrPublicUrl } from '../../lib/config'
 import { downloadBulkQrZip } from '../../lib/qr'
 import { StatusBadge } from '../../components/StatusBadge'
@@ -35,6 +35,8 @@ export function ManageQR() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [selectAllMatching, setSelectAllMatching] = useState(false)
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null)
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   const applyFilters = useCallback(
     <T,>(query: T): T => {
@@ -155,6 +157,21 @@ export function ManageQR() {
     setBulkProgress(null)
   }
 
+  async function handleBulkDelete() {
+    setBulkDeleting(true)
+    if (selectAllMatching) {
+      let query = supabase.from('qr_codes').delete()
+      query = applyFilters(query)
+      await query
+    } else {
+      await supabase.from('qr_codes').delete().in('id', Array.from(selectedIds))
+    }
+    setBulkDeleting(false)
+    setBulkDeleteConfirm(false)
+    clearSelection()
+    load()
+  }
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   return (
@@ -216,6 +233,14 @@ export function ManageQR() {
               className="rounded-lg border border-brand-300 bg-white px-3 py-1.5 font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-60"
             >
               Download SVG ZIP
+            </button>
+            <button
+              type="button"
+              onClick={() => setBulkDeleteConfirm(true)}
+              disabled={!!bulkProgress}
+              className="rounded-lg border border-red-300 bg-white px-3 py-1.5 font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+            >
+              Delete
             </button>
             <button type="button" onClick={clearSelection} className="px-2 py-1.5 text-gray-500 hover:text-gray-700">
               Clear
@@ -283,9 +308,13 @@ export function ManageQR() {
                   <td className="px-4 py-3 text-gray-600">{row.qr_name}</td>
                   <td className="px-4 py-3 text-gray-500">{row.batches?.batch_name ?? '—'}</td>
                   <td className="max-w-[220px] truncate px-4 py-3 text-brand-600">
-                    <a href={row.destination_url} target="_blank" rel="noreferrer" title={row.destination_url}>
-                      {row.destination_url}
-                    </a>
+                    {row.destination_url ? (
+                      <a href={row.destination_url} target="_blank" rel="noreferrer" title={row.destination_url}>
+                        {row.destination_url}
+                      </a>
+                    ) : (
+                      <span className="italic text-gray-400">Not set yet</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={row.status} />
@@ -349,6 +378,17 @@ export function ManageQR() {
         onCancel={() => setDeleteTarget(null)}
       />
 
+      <ConfirmDialog
+        open={bulkDeleteConfirm}
+        title={`Delete ${selectionCount} QR codes?`}
+        description="This will permanently remove all selected QR records and their links. This cannot be undone."
+        confirmLabel={`Delete ${selectionCount}`}
+        danger
+        loading={bulkDeleting}
+        onConfirm={handleBulkDelete}
+        onCancel={() => setBulkDeleteConfirm(false)}
+      />
+
       {editTarget && (
         <EditQrModal
           row={editTarget}
@@ -367,7 +407,7 @@ export function ManageQR() {
 
 function EditQrModal({ row, onClose, onSaved }: { row: Row; onClose: () => void; onSaved: () => void }) {
   const [qrName, setQrName] = useState(row.qr_name)
-  const [destinationUrl, setDestinationUrl] = useState(row.destination_url)
+  const [destinationUrl, setDestinationUrl] = useState(row.destination_url ?? '')
   const [status, setStatus] = useState<QrStatus>(row.status)
   const [newPassword, setNewPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -381,14 +421,25 @@ function EditQrModal({ row, onClose, onSaved }: { row: Row; onClose: () => void;
       setError('QR name is required.')
       return
     }
-    if (!isValidDestinationUrl(destinationUrl.trim())) {
+    const trimmedUrl = destinationUrl.trim()
+    if (trimmedUrl && !isValidDestinationUrl(trimmedUrl)) {
       setError('Please enter a valid URL.')
       return
     }
     setSaving(true)
+
+    if (trimmedUrl && trimmedUrl !== (row.destination_url ?? '')) {
+      const reachable = await isUrlReachable(trimmedUrl)
+      if (!reachable) {
+        setSaving(false)
+        setError("We couldn't open this link. Please double-check it.")
+        return
+      }
+    }
+
     const { error: updateError } = await supabase
       .from('qr_codes')
-      .update({ qr_name: qrName.trim(), destination_url: destinationUrl.trim(), status })
+      .update({ qr_name: qrName.trim(), destination_url: trimmedUrl || null, status })
       .eq('id', row.id)
     setSaving(false)
     if (updateError) {
@@ -431,7 +482,12 @@ function EditQrModal({ row, onClose, onSaved }: { row: Row; onClose: () => void;
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Destination Link</label>
-            <input value={destinationUrl} onChange={(e) => setDestinationUrl(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-brand-500" />
+            <input
+              value={destinationUrl}
+              onChange={(e) => setDestinationUrl(e.target.value)}
+              placeholder="Not set — first scan will prompt for it"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-brand-500"
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Status</label>
