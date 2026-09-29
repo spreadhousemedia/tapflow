@@ -34,15 +34,12 @@ export function Login() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
         <div className="mb-6 flex flex-col items-center text-center">
-          <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-brand-600 text-white">
+          <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-violet-600 text-white">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <rect x="3" y="3" width="7" height="7" rx="1.5" fill="currentColor" />
-              <rect x="14" y="3" width="7" height="7" rx="1.5" fill="currentColor" />
-              <rect x="3" y="14" width="7" height="7" rx="1.5" fill="currentColor" />
-              <rect x="14" y="14" width="7" height="7" rx="1.5" fill="currentColor" />
+              <path d="M6 6h12v3.5h-4.25V19h-3.5V9.5H6V6z" fill="currentColor" />
             </svg>
           </span>
-          <h1 className="text-xl font-bold text-gray-900">QRPanel Admin</h1>
+          <h1 className="text-xl font-bold text-gray-900">TapFlow Admin</h1>
           <p className="mt-1 text-sm text-gray-500">Sign in to manage your dynamic QR codes.</p>
         </div>
 

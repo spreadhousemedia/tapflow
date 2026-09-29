@@ -106,15 +106,12 @@ function SidebarContent({ onNavigate, onLogout }: { onNavigate: () => void; onLo
   return (
     <>
       <div className="flex h-16 shrink-0 items-center gap-2 border-b border-gray-200 px-5">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-white">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-600 text-white">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="3" width="7" height="7" rx="1.5" fill="currentColor" />
-            <rect x="14" y="3" width="7" height="7" rx="1.5" fill="currentColor" />
-            <rect x="3" y="14" width="7" height="7" rx="1.5" fill="currentColor" />
-            <rect x="14" y="14" width="7" height="7" rx="1.5" fill="currentColor" />
+            <path d="M6 6h12v3.5h-4.25V19h-3.5V9.5H6V6z" fill="currentColor" />
           </svg>
         </span>
-        <span className="text-lg font-bold text-gray-900">QRPanel</span>
+        <span className="text-lg font-bold text-gray-900">TapFlow</span>
       </div>
 
       <nav className="flex-1 space-y-1 px-3 py-4">
