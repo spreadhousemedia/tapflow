@@ -105,8 +105,8 @@ function SidebarContent({ onNavigate, onLogout }: { onNavigate: () => void; onLo
 
   return (
     <>
-      <div className="flex h-16 shrink-0 items-center border-b border-gray-200 px-5">
-        <img src="/tapflow-logo.png" alt="TapFlow" className="h-10 w-auto" />
+      <div className="h-16 shrink-0 overflow-hidden border-b border-gray-200">
+        <img src="/tapflow-logo.png" alt="TapFlow" className="h-full w-full object-cover" />
       </div>
 
       <nav className="flex-1 space-y-1 px-3 py-4">
