@@ -37,6 +37,8 @@ export function ManageQR() {
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null)
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
   const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [bulkDeleteError, setBulkDeleteError] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const applyFilters = useCallback(
     <T,>(query: T): T => {
@@ -106,10 +108,17 @@ export function ManageQR() {
   async function handleDelete() {
     if (!deleteTarget) return
     setDeleting(true)
-    await supabase.from('qr_codes').delete().eq('id', deleteTarget.id)
-    setDeleting(false)
-    setDeleteTarget(null)
-    load()
+    setDeleteError(null)
+    try {
+      const { error } = await supabase.from('qr_codes').delete().eq('id', deleteTarget.id)
+      if (error) throw error
+      setDeleteTarget(null)
+      load()
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Could not delete this QR code. Please try again.')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const allOnPageSelected = selectAllMatching || (rows.length > 0 && rows.every((r) => selectedIds.has(r.id)))
@@ -163,17 +172,30 @@ export function ManageQR() {
 
   async function handleBulkDelete() {
     setBulkDeleting(true)
-    if (selectAllMatching) {
-      let query = supabase.from('qr_codes').delete()
-      query = applyFilters(query)
-      await query
-    } else {
-      await supabase.from('qr_codes').delete().in('id', Array.from(selectedIds))
+    setBulkDeleteError(null)
+    try {
+      if (selectAllMatching) {
+        // PostgREST rejects a DELETE that carries no filter at all (a safety
+        // guard against accidentally wiping the whole table). When no
+        // search/status/batch filter is active, applyFilters adds nothing,
+        // so add a no-op filter that matches every row (id is never null)
+        // purely so the request always has one.
+        let query = supabase.from('qr_codes').delete().not('id', 'is', null)
+        query = applyFilters(query)
+        const { error } = await query
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('qr_codes').delete().in('id', Array.from(selectedIds))
+        if (error) throw error
+      }
+      setBulkDeleteConfirm(false)
+      clearSelection()
+      load()
+    } catch (err) {
+      setBulkDeleteError(err instanceof Error ? err.message : 'Could not delete the selected QR codes. Please try again.')
+    } finally {
+      setBulkDeleting(false)
     }
-    setBulkDeleting(false)
-    setBulkDeleteConfirm(false)
-    clearSelection()
-    load()
   }
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
@@ -369,23 +391,31 @@ export function ManageQR() {
       <ConfirmDialog
         open={!!deleteTarget}
         title={`Delete QR ${deleteTarget?.qr_number}?`}
-        description="This will permanently remove this QR record. This cannot be undone."
+        description={deleteError ?? 'This will permanently remove this QR record. This cannot be undone.'}
         confirmLabel="Delete"
         danger
         loading={deleting}
         onConfirm={handleDelete}
-        onCancel={() => setDeleteTarget(null)}
+        onCancel={() => {
+          setDeleteTarget(null)
+          setDeleteError(null)
+        }}
       />
 
       <ConfirmDialog
         open={bulkDeleteConfirm}
         title={`Delete ${selectionCount} QR codes?`}
-        description="This will permanently remove all selected QR records and their links. This cannot be undone."
+        description={
+          bulkDeleteError ?? 'This will permanently remove all selected QR records and their links. This cannot be undone.'
+        }
         confirmLabel={`Delete ${selectionCount}`}
         danger
         loading={bulkDeleting}
         onConfirm={handleBulkDelete}
-        onCancel={() => setBulkDeleteConfirm(false)}
+        onCancel={() => {
+          setBulkDeleteConfirm(false)
+          setBulkDeleteError(null)
+        }}
       />
 
       {editTarget && (
