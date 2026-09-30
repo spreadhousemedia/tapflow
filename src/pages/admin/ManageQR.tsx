@@ -112,13 +112,17 @@ export function ManageQR() {
     load()
   }
 
-  const allOnPageSelected = rows.length > 0 && rows.every((r) => selectedIds.has(r.id))
+  const allOnPageSelected = selectAllMatching || (rows.length > 0 && rows.every((r) => selectedIds.has(r.id)))
   const selectionCount = selectAllMatching ? total : selectedIds.size
 
   function toggleSelectAllOnPage() {
-    setSelectAllMatching(false)
     if (allOnPageSelected) {
       setSelectedIds(new Set())
+      setSelectAllMatching(false)
+    } else if (total > rows.length) {
+      // More rows match the current filters than fit on this page - "select
+      // all" should mean all of them, not just what happens to be visible.
+      setSelectAllMatching(true)
     } else {
       setSelectedIds(new Set(rows.map((r) => r.id)))
     }
@@ -212,11 +216,6 @@ export function ManageQR() {
       {selectionCount > 0 && (
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm">
           <span className="font-medium text-brand-800">{selectionCount} selected</span>
-          {!selectAllMatching && allOnPageSelected && total > rows.length && (
-            <button type="button" onClick={() => setSelectAllMatching(true)} className="text-brand-700 underline hover:text-brand-900">
-              Select all {total} matching QR codes
-            </button>
-          )}
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
