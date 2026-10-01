@@ -1,11 +1,18 @@
 import QRCode from 'qrcode'
 import JSZip from 'jszip'
+import jsPDF from 'jspdf'
 import { saveAs } from 'file-saver'
 import { qrPublicUrl } from './config'
 
 const QR_PIXEL_SIZE = 512
 const QR_MARGIN = 2
 const LABEL_HEIGHT = 72
+const QR_IMAGE_ASPECT = QR_PIXEL_SIZE / (QR_PIXEL_SIZE + LABEL_HEIGHT)
+
+const PDF_MARGIN_MM = 10
+const PDF_GAP_MM = 6
+const PDF_COLS = 3
+const PDF_ROWS = 4
 
 function escapeXml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -84,4 +91,46 @@ export async function downloadBulkQrZip(
   }
   const blob = await zip.generateAsync({ type: 'blob' })
   saveAs(blob, zipFileName)
+}
+
+/** Printable sheet: every QR code (with its label) laid out in a grid across as many A4 pages as needed. */
+export async function downloadBulkQrPdf(
+  qrNumbers: string[],
+  pdfFileName: string,
+  onProgress?: (done: number, total: number) => void,
+): Promise<void> {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const pageHeight = doc.internal.pageSize.getHeight()
+  const cellWidth = (pageWidth - PDF_MARGIN_MM * 2 - PDF_GAP_MM * (PDF_COLS - 1)) / PDF_COLS
+  const cellHeight = (pageHeight - PDF_MARGIN_MM * 2 - PDF_GAP_MM * (PDF_ROWS - 1)) / PDF_ROWS
+  const perPage = PDF_COLS * PDF_ROWS
+
+  let drawWidth = cellWidth
+  let drawHeight = drawWidth / QR_IMAGE_ASPECT
+  if (drawHeight > cellHeight) {
+    drawHeight = cellHeight
+    drawWidth = drawHeight * QR_IMAGE_ASPECT
+  }
+
+  for (let i = 0; i < qrNumbers.length; i++) {
+    const indexOnPage = i % perPage
+    if (i > 0 && indexOnPage === 0) doc.addPage()
+
+    const col = indexOnPage % PDF_COLS
+    const row = Math.floor(indexOnPage / PDF_COLS)
+    const cellX = PDF_MARGIN_MM + col * (cellWidth + PDF_GAP_MM)
+    const cellY = PDF_MARGIN_MM + row * (cellHeight + PDF_GAP_MM)
+    const x = cellX + (cellWidth - drawWidth) / 2
+    const y = cellY + (cellHeight - drawHeight) / 2
+
+    const dataUrl = await generateQrDataUrl(qrNumbers[i])
+    // Without an explicit compression level, jsPDF embeds PNGs completely
+    // uncompressed (raw bitmap) - a 13KB QR image balloons to ~900KB each,
+    // so a few hundred codes would produce a multi-hundred-MB file.
+    doc.addImage(dataUrl, 'PNG', x, y, drawWidth, drawHeight, undefined, 'SLOW')
+    onProgress?.(i + 1, qrNumbers.length)
+  }
+
+  doc.save(pdfFileName)
 }

@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { isUrlReachable, isValidDestinationUrl, isValidPassword, normalizeDestinationUrl } from '../../lib/validation'
 import { qrPublicUrl } from '../../lib/config'
-import { downloadBulkQrZip } from '../../lib/qr'
+import { downloadBulkQrPdf, downloadBulkQrZip } from '../../lib/qr'
 import { StatusBadge } from '../../components/StatusBadge'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { Spinner } from '../../components/Spinner'
@@ -162,11 +162,15 @@ export function ManageQR() {
     return rows.filter((r) => selectedIds.has(r.id)).map((r) => r.qr_number)
   }
 
-  async function handleBulkDownload(format: 'png' | 'svg') {
+  async function handleBulkDownload(format: 'png' | 'svg' | 'pdf') {
     const numbers = await getSelectedQrNumbers()
     if (numbers.length === 0) return
     setBulkProgress({ done: 0, total: numbers.length })
-    await downloadBulkQrZip(numbers, format, `qr_codes_${format}.zip`, (done, t) => setBulkProgress({ done, total: t }))
+    if (format === 'pdf') {
+      await downloadBulkQrPdf(numbers, 'qr_codes.pdf', (done, t) => setBulkProgress({ done, total: t }))
+    } else {
+      await downloadBulkQrZip(numbers, format, `qr_codes_${format}.zip`, (done, t) => setBulkProgress({ done, total: t }))
+    }
     setBulkProgress(null)
   }
 
@@ -254,6 +258,14 @@ export function ManageQR() {
               className="rounded-lg border border-brand-300 bg-white px-3 py-1.5 font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-60"
             >
               Download SVG ZIP
+            </button>
+            <button
+              type="button"
+              onClick={() => handleBulkDownload('pdf')}
+              disabled={!!bulkProgress}
+              className="rounded-lg border border-brand-300 bg-white px-3 py-1.5 font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-60"
+            >
+              Download PDF
             </button>
             <button
               type="button"

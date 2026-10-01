@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { isUrlReachable, isValidDestinationUrl, isValidPassword, normalizeDestinationUrl, SERIES_PREFIX_PATTERN } from '../../lib/validation'
 import { rpcErrorMessage, type PasswordMode } from '../../types'
-import { downloadBulkQrZip } from '../../lib/qr'
+import { downloadBulkQrPdf, downloadBulkQrZip } from '../../lib/qr'
 import { downloadPasswordsCsv } from '../../lib/csv'
 import { Spinner } from '../../components/Spinner'
 
@@ -143,13 +143,18 @@ export function BulkQR() {
     return (data ?? []).map((r) => r.qr_number as string)
   }
 
-  async function handleBulkDownload(format: 'png' | 'svg') {
+  async function handleBulkDownload(format: 'png' | 'svg' | 'pdf') {
     const numbers = await getBatchQrNumbers()
     if (numbers.length === 0) return
     setDownloadProgress({ done: 0, total: numbers.length })
-    await downloadBulkQrZip(numbers, format, `${batchName.trim().replace(/\s+/g, '_')}_${format}.zip`, (done, total) =>
-      setDownloadProgress({ done, total }),
-    )
+    const baseName = batchName.trim().replace(/\s+/g, '_')
+    if (format === 'pdf') {
+      await downloadBulkQrPdf(numbers, `${baseName}.pdf`, (done, total) => setDownloadProgress({ done, total }))
+    } else {
+      await downloadBulkQrZip(numbers, format, `${baseName}_${format}.zip`, (done, total) =>
+        setDownloadProgress({ done, total }),
+      )
+    }
     setDownloadProgress(null)
   }
 
@@ -207,6 +212,14 @@ export function BulkQR() {
               className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
             >
               Download SVG ZIP
+            </button>
+            <button
+              type="button"
+              onClick={() => handleBulkDownload('pdf')}
+              disabled={!!downloadProgress}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+            >
+              Download PDF
             </button>
           </div>
 
