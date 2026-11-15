@@ -10,10 +10,7 @@ interface AuthContextValue {
   signOut: () => Promise<void>
 }
 
-const AUTH_KEY = 'spreadnfc_admin_auth'
 const SESSION_KEY = 'spreadnfc_admin_session'
-const DEFAULT_EMAIL = 'admin@spreadnfc.in'
-const DEFAULT_PASSWORD = 'admin123'
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
@@ -22,7 +19,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // 1. Check local session fallback first
+    // 1. Check persisted Supabase session in localStorage
     const savedSessionStr = localStorage.getItem(SESSION_KEY)
     if (savedSessionStr) {
       try {
@@ -51,6 +48,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
       if (newSession) {
         setSession(newSession)
+      } else {
+        // Session expired or signed out on another tab
+        setSession(null)
+        localStorage.removeItem(SESSION_KEY)
       }
     })
 
@@ -61,7 +62,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const cleanEmail = email.trim().toLowerCase()
     const cleanPassword = password.trim()
 
-    // 1. Try real Supabase auth first
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
@@ -76,57 +76,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }))
         return { error: null }
       }
+
+      return { error: 'Invalid email or password.' }
     } catch {
-      // Supabase network / auth failed, fallback to local verification
+      return { error: 'Unable to connect. Please check your connection and try again.' }
     }
-
-    // 2. Check local admin credentials / default credentials
-    const storedCredStr = localStorage.getItem(AUTH_KEY)
-    let validEmail = DEFAULT_EMAIL
-    let validPassword = DEFAULT_PASSWORD
-
-    if (storedCredStr) {
-      try {
-        const stored = JSON.parse(storedCredStr)
-        validEmail = (stored.email || validEmail).toLowerCase()
-        validPassword = stored.password || validPassword
-      } catch {
-        // ignore
-      }
-    }
-
-    const acceptedEmails = [validEmail.toLowerCase(), 'admin@spreadnfc.in', 'admin@tapflow.in']
-    const isDefaultPass = cleanPassword === 'admin123' || cleanPassword === 'admin'
-    const isCustomPass = cleanPassword === validPassword
-
-    if (acceptedEmails.includes(cleanEmail) && (isCustomPass || isDefaultPass)) {
-      const fallbackUser: User = {
-        id: 'admin-master-user',
-        app_metadata: { provider: 'email' },
-        user_metadata: { full_name: 'Administrator' },
-        aud: 'authenticated',
-        created_at: new Date().toISOString(),
-        email: cleanEmail,
-        role: 'authenticated',
-      } as unknown as User
-
-      const fallbackSession: Session = {
-        access_token: 'tapflow-session-token',
-        refresh_token: 'tapflow-refresh-token',
-        expires_in: 86400 * 7,
-        token_type: 'bearer',
-        user: fallbackUser,
-      } as unknown as Session
-
-      localStorage.setItem(SESSION_KEY, JSON.stringify({
-        session: fallbackSession,
-        saved_at: new Date().toISOString(),
-      }))
-      setSession(fallbackSession)
-      return { error: null }
-    }
-
-    return { error: 'Invalid email or password.' }
   }
 
   async function signOut() {
@@ -134,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await supabase.auth.signOut()
     } catch {
-      // ignore
+      // ignore network errors on sign-out
     }
     setSession(null)
   }

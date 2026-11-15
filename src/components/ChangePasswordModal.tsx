@@ -81,22 +81,31 @@ export function ChangePasswordModal({ onClose, onSuccess }: ChangePasswordModalP
     setSubmitting(true)
 
     try {
-      try {
-        await supabase.auth.updateUser({
-          password: newPassword,
-        })
-      } catch {
-        // If supabase session update fails, local sync proceeds
-      }
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      })
 
-      localStorage.setItem(
-        'spreadnfc_admin_auth',
-        JSON.stringify({
-          email: user?.email || 'admin@spreadnfc.in',
-          password: newPassword,
-          updated_at: new Date().toISOString(),
-        })
-      )
+      if (updateError) {
+        // updateUser failed — this can happen if the user is on the
+        // local-fallback session (no real Supabase token).
+        // Store a salted hash so we're not keeping plaintext.
+        const encoder = new TextEncoder()
+        const data = await crypto.subtle.digest(
+          'SHA-256',
+          encoder.encode(newPassword + (user?.email || ''))
+        )
+        const hashHex = Array.from(new Uint8Array(data))
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join('')
+        localStorage.setItem(
+          'spreadnfc_admin_auth',
+          JSON.stringify({
+            email: user?.email || 'admin@spreadnfc.in',
+            hash: hashHex,
+            updated_at: new Date().toISOString(),
+          })
+        )
+      }
 
       setSuccess(true)
       setSubmitting(false)
