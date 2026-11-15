@@ -1,0 +1,33 @@
+# Exclude everything Vercel doesn't need to build or serve
+
+# Database / SQL files — server-side only, never needed on the CDN
+*.sql
+restore_scripts/
+tapflow backup/
+FULL_DATABASE_RESTORE.sql
+supabase_schema.sql
+
+# Dev / local tooling
+.claude/
+.env.example
+
+# OS & editor noise
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# TypeScript build cache (not needed; Vercel runs tsc from scratch)
+*.tsbuildinfo
+
+# Already built output — Vercel builds from source
+dist/
+dist-ssr/

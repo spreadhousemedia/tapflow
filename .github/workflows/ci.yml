@@ -1,4 +1,4 @@
-name: CI — Build & Type-Check
+name: CI — Build, Type-Check & Deploy
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
     branches: [main, master]
 
 jobs:
+  # ─── 1. Type-check + build (runs on every push & PR) ───────────────────────
   build:
     name: Type-check & Production Build
     runs-on: ubuntu-latest
@@ -40,4 +41,38 @@ jobs:
           name: dist
           path: dist/
           retention-days: 7
+
+  # ─── 2. Deploy to Vercel (only on pushes to main / master) ─────────────────
+  deploy:
+    name: Deploy to Vercel
+    runs-on: ubuntu-latest
+    needs: build
+    # Only deploy on direct pushes to main — not on PRs
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel environment
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build via Vercel CLI
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_APP_BASE_URL: ${{ secrets.VITE_APP_BASE_URL }}
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy prebuilt output to Vercel
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
 
