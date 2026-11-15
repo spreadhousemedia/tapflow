@@ -3,7 +3,6 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "installCommand": "npm ci",
-
   "headers": [
     {
       "source": "/assets/(.*)",
@@ -57,7 +56,6 @@
       ]
     }
   ],
-
   "rewrites": [
     {
       "source": "/((?!api/).*)",
@@ -65,4 +63,3 @@
     }
   ]
 }
-
