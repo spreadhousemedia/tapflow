@@ -14,6 +14,7 @@ const CreateQR = lazy(() => import('./pages/admin/CreateQR').then((m) => ({ defa
 const BulkQR = lazy(() => import('./pages/admin/BulkQR').then((m) => ({ default: m.BulkQR })))
 const UploadCSV = lazy(() => import('./pages/admin/UploadCSV').then((m) => ({ default: m.UploadCSV })))
 const ManageQR = lazy(() => import('./pages/admin/ManageQR').then((m) => ({ default: m.ManageQR })))
+const AdminAccess = lazy(() => import('./pages/admin/AdminAccess').then((m) => ({ default: m.AdminAccess })))
 
 function PageFallback() {
   return (
@@ -40,6 +41,7 @@ export default function App() {
                 <Route path="bulk" element={<BulkQR />} />
                 <Route path="upload" element={<UploadCSV />} />
                 <Route path="manage" element={<ManageQR />} />
+                <Route path="access" element={<AdminAccess />} />
               </Route>
             </Route>
 

@@ -1,6 +1,7 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { ChangePasswordModal } from './ChangePasswordModal'
 
 const NAV_ITEMS = [
   { to: '/admin', label: 'Dashboard', end: true, icon: DashboardIcon },
@@ -8,6 +9,7 @@ const NAV_ITEMS = [
   { to: '/admin/bulk', label: 'Bulk QR', end: false, icon: BulkIcon },
   { to: '/admin/upload', label: 'Upload CSV', end: false, icon: UploadIcon },
   { to: '/admin/manage', label: 'Manage QR', end: false, icon: ManageIcon },
+  { to: '/admin/access', label: 'Admin Access', end: false, icon: SecurityIcon },
 ]
 
 export function AdminLayout() {
@@ -15,6 +17,7 @@ export function AdminLayout() {
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false)
 
   const displayName =
     (user?.user_metadata?.full_name as string | undefined) || user?.email?.split('@')[0] || 'Admin'
@@ -29,7 +32,11 @@ export function AdminLayout() {
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar (desktop) */}
       <aside className="hidden w-64 shrink-0 flex-col border-r border-gray-200 bg-white md:flex">
-        <SidebarContent onNavigate={() => {}} onLogout={handleLogout} />
+        <SidebarContent
+          onNavigate={() => {}}
+          onLogout={handleLogout}
+          onChangePassword={() => setChangePasswordOpen(true)}
+        />
       </aside>
 
       {/* Sidebar (mobile drawer) */}
@@ -37,7 +44,14 @@ export function AdminLayout() {
         <div className="fixed inset-0 z-40 flex md:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setMobileNavOpen(false)} />
           <aside className="relative z-50 flex w-64 flex-col bg-white shadow-xl">
-            <SidebarContent onNavigate={() => setMobileNavOpen(false)} onLogout={handleLogout} />
+            <SidebarContent
+              onNavigate={() => setMobileNavOpen(false)}
+              onLogout={handleLogout}
+              onChangePassword={() => {
+                setMobileNavOpen(false)
+                setChangePasswordOpen(true)
+              }}
+            />
           </aside>
         </div>
       )}
@@ -60,7 +74,7 @@ export function AdminLayout() {
             <button
               type="button"
               onClick={() => setMenuOpen((o) => !o)}
-              className="flex items-center gap-2 rounded-full"
+              className="flex items-center gap-2 rounded-full hover:ring-2 hover:ring-brand-500/20 transition-all"
               aria-haspopup="true"
               aria-expanded={menuOpen}
             >
@@ -71,16 +85,41 @@ export function AdminLayout() {
             {menuOpen && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-                <div className="absolute right-0 z-20 mt-2 w-56 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                <div className="absolute right-0 z-20 mt-2 w-56 rounded-xl border border-gray-200 bg-white py-1 shadow-xl">
                   <div className="border-b border-gray-100 px-4 py-3">
                     <p className="truncate text-sm font-medium text-gray-900">{displayName}</p>
                     <p className="truncate text-xs text-gray-500">{user?.email}</p>
                   </div>
+
+                  <Link
+                    to="/admin/access"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    <SecuritySmallIcon />
+                    Admin Access
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      setChangePasswordOpen(true)
+                    }}
+                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    <KeyMenuIcon />
+                    Change Password
+                  </button>
+
+                  <div className="border-t border-gray-100 my-1" />
+
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
                   >
+                    <LogoutSmallIcon />
                     Logout
                   </button>
                 </div>
@@ -93,11 +132,24 @@ export function AdminLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Change Password Modal */}
+      {changePasswordOpen && (
+        <ChangePasswordModal onClose={() => setChangePasswordOpen(false)} />
+      )}
     </div>
   )
 }
 
-function SidebarContent({ onNavigate, onLogout }: { onNavigate: () => void; onLogout: () => void }) {
+function SidebarContent({
+  onNavigate,
+  onLogout,
+  onChangePassword,
+}: {
+  onNavigate: () => void
+  onLogout: () => void
+  onChangePassword: () => void
+}) {
   const { user } = useAuth()
   const displayName =
     (user?.user_metadata?.full_name as string | undefined) || user?.email?.split('@')[0] || 'Admin'
@@ -118,7 +170,7 @@ function SidebarContent({ onNavigate, onLogout }: { onNavigate: () => void; onLo
             onClick={onNavigate}
             className={({ isActive }) =>
               `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                isActive ? 'bg-brand-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+                isActive ? 'bg-brand-600 text-white shadow-xs' : 'text-gray-600 hover:bg-gray-100'
               }`
             }
           >
@@ -128,7 +180,7 @@ function SidebarContent({ onNavigate, onLogout }: { onNavigate: () => void; onLo
         ))}
       </nav>
 
-      <div className="border-t border-gray-200 p-3">
+      <div className="border-t border-gray-200 p-3 space-y-1">
         <div className="flex items-center gap-3 rounded-lg px-3 py-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">
             {initial}
@@ -138,10 +190,20 @@ function SidebarContent({ onNavigate, onLogout }: { onNavigate: () => void; onLo
             <p className="truncate text-xs text-gray-500">{user?.email}</p>
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={onChangePassword}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+        >
+          <KeyMenuIcon />
+          Change Password
+        </button>
+
         <button
           type="button"
           onClick={onLogout}
-          className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100"
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
         >
           <LogoutIcon />
           Logout
@@ -161,6 +223,7 @@ function DashboardIcon() {
     </svg>
   )
 }
+
 function CreateIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -169,6 +232,7 @@ function CreateIcon() {
     </svg>
   )
 }
+
 function BulkIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -177,6 +241,7 @@ function BulkIcon() {
     </svg>
   )
 }
+
 function UploadIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -185,6 +250,7 @@ function UploadIcon() {
     </svg>
   )
 }
+
 function ManageIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -194,9 +260,44 @@ function ManageIcon() {
     </svg>
   )
 }
-function LogoutIcon() {
+
+function SecurityIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+  )
+}
+
+function KeyMenuIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="7.5" cy="15.5" r="5.5" />
+      <path d="M11.5 11.5L22 1M18 5l3 3M15 8l3 3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function SecuritySmallIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+  )
+}
+
+function LogoutIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M16 17l5-5-5-5M21 12H9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function LogoutSmallIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M16 17l5-5-5-5M21 12H9" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
