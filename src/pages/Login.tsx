@@ -24,7 +24,7 @@ export function Login() {
     const { error } = await signIn(email, password)
     setSubmitting(false)
     if (error) {
-      setError('Invalid email or password.')
+      setError(error)
       return
     }
     navigate('/admin', { replace: true })

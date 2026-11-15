@@ -68,7 +68,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password: cleanPassword,
       })
 
-      if (!error && data?.session) {
+      if (error) {
+        console.error('[Supabase Auth Error]:', error)
+        return { error: error.message || 'Invalid email or password.' }
+      }
+
+      if (data?.session) {
         setSession(data.session)
         localStorage.setItem(SESSION_KEY, JSON.stringify({
           session: data.session,
@@ -77,9 +82,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: null }
       }
 
-      return { error: 'Invalid email or password.' }
-    } catch {
-      return { error: 'Unable to connect. Please check your connection and try again.' }
+      return { error: 'Failed to sign in. Please try again.' }
+    } catch (err: unknown) {
+      console.error('[Supabase Auth Exception]:', err)
+      return { error: err instanceof Error ? err.message : 'Unable to connect. Please check your connection and try again.' }
     }
   }
 
